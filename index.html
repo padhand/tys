@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS Director Pro (Mobile Ready)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Custom Range Slider Styling for Mobile */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            margin-top: -6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #e5e7eb;
+            border-radius: 2px;
+        }
+        .dark input[type=range]::-webkit-slider-runnable-track {
+            background: #4b5563;
+        }
+        
+        /* Smooth scrolling */
+        html { scroll-behavior: smooth; }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .recording-pulse { animation: pulse-red 1.5s infinite; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 font-sans transition-colors duration-200">
+
+    <div id="app" class="max-w-md mx-auto min-h-screen relative pb-24 shadow-2xl bg-white dark:bg-gray-900">
+        
+        <header class="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex justify-between items-center">
+            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-600">
+                <i class="fa-solid fa-microphone-lines mr-2 text-blue-500"></i>TTS Director
+            </h1>
+            <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                <i class="fa-solid fa-moon dark:hidden text-gray-600"></i>
+                <i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
+            </button>
+        </header>
+
+        <section id="input-section" class="p-4 space-y-4">
+            <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
+                <p class="text-sm text-blue-800 dark:text-blue-200 mb-2 font-medium">1. Import Subtitles</p>
+                <div class="flex gap-2">
+                    <label class="flex-1 flex items-center justify-center px-4 py-3 bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 transition shadow-sm">
+                        <span class="text-sm text-gray-500 dark:text-gray-400"><i class="fa-solid fa-upload mr-2"></i>Upload .srt</span>
+                        <input type="file" id="srt-file" accept=".srt" class="hidden" onchange="handleFileUpload(this)">
+                    </label>
+                    <button onclick="loadDemo()" class="px-4 py-2 text-sm bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-200 rounded-lg hover:bg-blue-200 transition">Demo</button>
+                </div>
+            </div>
+
+            <div class="relative">
+                <textarea id="srt-text" class="w-full h-40 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none text-sm font-mono shadow-inner" placeholder="Paste SRT content here..."></textarea>
+                <div class="absolute bottom-3 right-3 text-xs text-gray-400">SRT Format</div>
+            </div>
+
+            <button onclick="parseSRT()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/30 transition transform active:scale-95 flex items-center justify-center">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Generate Director
+            </button>
+        </section>
+
+        <section id="director-section" class="hidden">
+            <div class="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex gap-2 overflow-x-auto no-scrollbar">
+                <button onclick="resetView()" class="px-3 py-1.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 rounded-lg whitespace-nowrap">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Back
+                </button>
+                <button onclick="applyGlobalVoice()" class="px-3 py-1.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 rounded-lg whitespace-nowrap">
+                    Set All Voices
+                </button>
+                <button onclick="generateSSML()" class="px-3 py-1.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300 rounded-lg whitespace-nowrap">
+                    <i class="fa-solid fa-code mr-1"></i> Get SSML
+                </button>
+                 <button onclick="initRecording()" class="px-3 py-1.5 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-lg whitespace-nowrap flex items-center">
+                    <i class="fa-solid fa-file-audio mr-1"></i> Record
+                </button>
+            </div>
+            <div id="segments-container" class="p-4 space-y-4"></div>
+        </section>
+
+        <div id="player-footer" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-transform duration-300 translate-y-full z-40">
+            <div class="flex items-center justify-between gap-4">
+                <div class="flex-1">
+                    <div id="now-playing-text" class="text-xs text-gray-500 dark:text-gray-400 truncate mb-1">Ready to play</div>
+                    <div class="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-blue-500 w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="stopPlayback()" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 text-red-500 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 transition">
+                        <i class="fa-solid fa-stop"></i>
+                    </button>
+                    <button id="play-btn" onclick="startPlayback()" class="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/40 hover:bg-blue-700 transition transform active:scale-95">
+                        <i class="fa-solid fa-play ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ssml-modal" class="fixed inset-0 z-[60] bg-black/50 hidden items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">Generated SSML</h3>
+                <button onclick="closeModal('ssml-modal')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <textarea id="ssml-output" readonly class="w-full h-48 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-xs font-mono mb-4 focus:outline-none"></textarea>
+            <div class="flex gap-2">
+                <button onclick="copySSML()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">Copy</button>
+                <button onclick="closeModal('ssml-modal')" class="flex-1 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="record-modal" class="fixed inset-0 z-[60] bg-black/50 hidden items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm shadow-2xl p-6">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-microphone text-red-500 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold mb-2">Record Audio</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400" id="record-msg-desktop">
+                    Use desktop to capture clear digital audio.
+                </p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 hidden" id="record-msg-mobile">
+                    <b>Mobile Mode:</b> Audio will be recorded via your Microphone. 
+                    <br><br>
+                    <span class="text-orange-500"><i class="fa-solid fa-volume-high"></i> Turn volume to MAX</span><br>
+                    <span class="text-green-500"><i class="fa-solid fa-location-dot"></i> Find a quiet room</span>
+                </p>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="startRecordingSequence()" class="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition shadow-lg shadow-red-500/30">Start Recording</button>
+                <button onclick="closeModal('record-modal')" class="px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-medium">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <template id="segment-template">
+        <div class="segment-card bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm transition-all hover:shadow-md">
+            <div class="flex justify-between items-start mb-3">
+                <span class="segment-id px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-xs font-bold rounded text-gray-500">#1</span>
+                <span class="segment-time text-xs font-mono text-gray-400">00:00 -> 00:04</span>
+            </div>
+            <textarea class="segment-text w-full bg-transparent text-lg font-medium text-gray-800 dark:text-gray-100 border-none focus:ring-0 p-0 resize-none mb-4 leading-tight" rows="2"></textarea>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-2 mb-3">
+                <div class="col-span-2">
+                    <label class="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-1 block">Voice</label>
+                    <select class="segment-voice w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm p-2 focus:ring-1 focus:ring-blue-500 outline-none"></select>
+                </div>
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-[10px] text-gray-400">PITCH</label>
+                        <span class="text-[10px] font-mono text-blue-500 segment-pitch-val">1.0</span>
+                    </div>
+                    <input type="range" class="segment-pitch" min="0" max="2" step="0.1" value="1">
+                </div>
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-[10px] text-gray-400">SPEED</label>
+                        <span class="text-[10px] font-mono text-blue-500 segment-rate-val">1.0</span>
+                    </div>
+                    <input type="range" class="segment-rate" min="0.5" max="2" step="0.1" value="1">
+                </div>
+            </div>
+            <div class="pt-2 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                <div class="text-[10px] text-gray-400">Pause: <span class="segment-break font-mono text-gray-600 dark:text-gray-300">0ms</span></div>
+                <button class="play-segment-btn w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-800 transition"><i class="fa-solid fa-play text-xs"></i></button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        // --- Core Variables ---
+        let segments = []; 
+        let voices = [];
+        let isPlaying = false;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let playQueue = [];
+        
+        // --- DOM Elements ---
+        const srtText = document.getElementById('srt-text');
+        const inputSection = document.getElementById('input-section');
+        const directorSection = document.getElementById('director-section');
+        const container = document.getElementById('segments-container');
+        const playerFooter = document.getElementById('player-footer');
+        const progressBar = document.getElementById('progress-bar');
+        const nowPlayingText = document.getElementById('now-playing-text');
+        const playBtnIcon = document.querySelector('#play-btn i');
+        const playBtn = document.getElementById('play-btn');
+        
+        // --- Init ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadVoices();
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = loadVoices;
+            }
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+            }
+        });
+
+        function toggleTheme() { document.documentElement.classList.toggle('dark'); }
+
+        function loadVoices() {
+            voices = window.speechSynthesis.getVoices().sort((a, b) => a.name.localeCompare(b.name));
+            document.querySelectorAll('.segment-voice').forEach(populateVoiceSelect);
+        }
+
+        function populateVoiceSelect(selectElement) {
+            const currentVal = selectElement.value;
+            selectElement.innerHTML = '';
+            voices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.textContent = `${voice.name} (${voice.lang})`;
+                option.value = index; 
+                if (voice.default) option.selected = true;
+                selectElement.appendChild(option);
+            });
+            if(currentVal) selectElement.value = currentVal;
+        }
+
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        // --- SRT Logic ---
+        function timeToMs(timeString) {
+            const [hms, ms] = timeString.split(',');
+            const [h, m, s] = hms.split(':').map(Number);
+            return ((h * 3600) + (m * 60) + s) * 1000 + parseInt(ms);
+        }
+
+        function loadDemo() {
+            srtText.value = `1
+00:00:00,500 --> 00:00:03,000
+This is the mobile compatible version.
+
+2
+00:00:03,500 --> 00:00:06,000
+It uses your microphone to capture the audio.
+
+3
+00:00:06,500 --> 00:00:09,000
+Please ensure your volume is loud and the room is quiet.`;
+        }
+
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => { srtText.value = e.target.result; };
+            reader.readAsText(file);
+        }
+
+        function parseSRT() {
+            const text = srtText.value.trim();
+            if (!text) { alert("Please paste SRT text."); return; }
+            
+            const regex = /(\d+)\n(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})\n([\s\S]*?)(?=\n\n|\n*$)/g;
+            let match;
+            segments = [];
+            const normalizedText = text.replace(/\r\n/g, '\n') + '\n\n';
+
+            while ((match = regex.exec(normalizedText)) !== null) {
+                segments.push({
+                    id: match[1],
+                    startStr: match[2],
+                    endStr: match[3],
+                    startMs: timeToMs(match[2]),
+                    endMs: timeToMs(match[3]),
+                    text: match[4].trim(),
+                    voiceIndex: 0, pitch: 1.0, rate: 1.0
+                });
+            }
+
+            if (segments.length === 0) { alert("Invalid SRT format."); return; }
+
+            for (let i = 0; i < segments.length - 1; i++) {
+                segments[i].breakMs = Math.max(0, segments[i+1].startMs - segments[i].endMs);
+            }
+            segments[segments.length-1].breakMs = 0; 
+            renderDirector();
+        }
+
+        function renderDirector() {
+            inputSection.classList.add('hidden');
+            directorSection.classList.remove('hidden');
+            playerFooter.classList.remove('translate-y-full');
+            container.innerHTML = '';
+            const template = document.getElementById('segment-template');
+
+            segments.forEach((seg, index) => {
+                const clone = template.content.cloneNode(true);
+                clone.querySelector('.segment-id').textContent = `#${seg.id}`;
+                clone.querySelector('.segment-time').textContent = `${seg.startStr.split(',')[0]} -> ${seg.endStr.split(',')[0]}`;
+                
+                const textArea = clone.querySelector('.segment-text');
+                textArea.value = seg.text;
+                textArea.onchange = (e) => { segments[index].text = e.target.value; };
+
+                const voiceSelect = clone.querySelector('.segment-voice');
+                populateVoiceSelect(voiceSelect);
+                voiceSelect.value = seg.voiceIndex || 0;
+                voiceSelect.onchange = (e) => { segments[index].voiceIndex = parseInt(e.target.value); };
+
+                const pitchInput = clone.querySelector('.segment-pitch');
+                const rateInput = clone.querySelector('.segment-rate');
+                pitchInput.value = seg.pitch;
+                rateInput.value = seg.rate;
+
+                pitchInput.oninput = (e) => { 
+                    segments[index].pitch = parseFloat(e.target.value); 
+                    clone.querySelector('.segment-pitch-val').textContent = e.target.value; 
+                };
+                rateInput.oninput = (e) => { 
+                    segments[index].rate = parseFloat(e.target.value); 
+                    clone.querySelector('.segment-rate-val').textContent = e.target.value; 
+                };
+
+                clone.querySelector('.segment-break').textContent = `${seg.breakMs}ms`;
+                clone.querySelector('.play-segment-btn').onclick = () => playOneSegment(index);
+                container.appendChild(clone);
+            });
+        }
+
+        function resetView() {
+            stopPlayback();
+            directorSection.classList.add('hidden');
+            inputSection.classList.remove('hidden');
+            playerFooter.classList.add('translate-y-full');
+        }
+
+        function applyGlobalVoice() {
+            if(!segments.length) return;
+            const v = segments[0].voiceIndex;
+            segments.forEach(s => s.voiceIndex = v);
+            document.querySelectorAll('.segment-voice').forEach(s => s.value = v);
+        }
+
+        // --- NEW Recording Logic (Mobile Support) ---
+        function initRecording() {
+            const modal = document.getElementById('record-modal');
+            const msgDesktop = document.getElementById('record-msg-desktop');
+            const msgMobile = document.getElementById('record-msg-mobile');
+
+            if (isMobile()) {
+                msgDesktop.classList.add('hidden');
+                msgMobile.classList.remove('hidden');
+            } else {
+                msgDesktop.classList.remove('hidden');
+                msgMobile.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        async function startRecordingSequence() {
+            closeModal('record-modal');
+            let stream;
+
+            try {
+                if (isMobile()) {
+                    // Mobile: Use Microphone (Acoustic Loopback)
+                    // IMPORTANT: echoCancellation: false forces the mic to hear the speaker
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                            sampleRate: 44100
+                        }
+                    });
+                } else {
+                    // Desktop: Use Tab Capture
+                    stream = await navigator.mediaDevices.getDisplayMedia({ 
+                        video: true, audio: true, preferCurrentTab: true 
+                    });
+                }
+
+                // Check tracks
+                if (stream.getAudioTracks().length === 0) {
+                    alert("No audio track found. Please ensure permissions are granted.");
+                    return;
+                }
+
+                audioChunks = [];
+                // Check format support (iOS likes MP4/AAC, Android likes WebM)
+                let mimeType = 'audio/webm;codecs=opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/mp4'; 
+                    if(!MediaRecorder.isTypeSupported(mimeType)) mimeType = ''; // Default
+                }
+
+                mediaRecorder = mimeType ? new MediaRecorder(stream, {mimeType}) : new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                mediaRecorder.onstop = saveRecording;
+
+                mediaRecorder.start();
+                isRecording = true;
+                
+                playBtn.classList.add('recording-pulse', 'bg-red-600');
+                playBtn.classList.remove('bg-blue-600');
+
+                // Delay playback slightly to allow recorder to spin up
+                setTimeout(() => startPlayback(true), 500);
+
+            } catch (err) {
+                console.error(err);
+                alert("Recording failed: " + err.message);
+            }
+        }
+
+        function saveRecording() {
+            isRecording = false;
+            playBtn.classList.remove('recording-pulse', 'bg-red-600');
+            playBtn.classList.add('bg-blue-600');
+
+            if(mediaRecorder && mediaRecorder.stream) {
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+
+            const blob = new Blob(audioChunks, { type: audioChunks[0]?.type || 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `tts_export_${Date.now()}.webm`; // Most universal ext
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            nowPlayingText.textContent = "Download saved!";
+        }
+
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        }
+
+        // --- Playback ---
+        function playOneSegment(index) {
+            stopPlayback();
+            speakSegment(segments[index]);
+            nowPlayingText.textContent = `Preview: #${segments[index].id}`;
+            playBtnIcon.className = "fa-solid fa-stop";
+        }
+
+        function startPlayback(isRec = false) {
+            if (isPlaying) { stopPlayback(); return; }
+            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+            
+            isPlaying = true;
+            if(!isRec) playBtnIcon.className = "fa-solid fa-stop";
+            playQueue = [...segments]; 
+            playNextInQueue();
+        }
+
+        function playNextInQueue() {
+            if (!isPlaying || playQueue.length === 0) {
+                if(isRecording) setTimeout(() => { if(mediaRecorder) mediaRecorder.stop(); }, 1000); // 1s tail
+                stopPlayback();
+                return;
+            }
+
+            const seg = playQueue.shift(); 
+            const percent = ((segments.length - playQueue.length) / segments.length) * 100;
+            progressBar.style.width = `${percent}%`;
+            nowPlayingText.textContent = isRecording ? `Recording #${seg.id}...` : `Playing #${seg.id}...`;
+
+            speakSegment(seg, () => {
+                if(!isPlaying) return;
+                if (seg.breakMs > 0) {
+                    setTimeout(playNextInQueue, seg.breakMs);
+                } else {
+                    playNextInQueue();
+                }
+            });
+        }
+
+        function speakSegment(seg, onEndCallback) {
+            const u = new SpeechSynthesisUtterance(seg.text);
+            const voice = voices[seg.voiceIndex];
+            if (voice) u.voice = voice;
+            u.pitch = seg.pitch;
+            u.rate = seg.rate;
+            
+            u.onend = () => { if(onEndCallback) onEndCallback(); else if(!isPlaying) playBtnIcon.className = "fa-solid fa-play"; };
+            u.onerror = (e) => { console.error("TTS Err", e); if(onEndCallback) onEndCallback(); };
+            
+            window.speechSynthesis.speak(u);
+        }
+
+        function stopPlayback() {
+            isPlaying = false;
+            window.speechSynthesis.cancel();
+            playBtnIcon.className = "fa-solid fa-play ml-1";
+            nowPlayingText.textContent = "Stopped";
+            progressBar.style.width = "0%";
+            if(isRecording && mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        }
+
+        function generateSSML() {
+            let ssml = `<speak>\n` + segments.map(s => `  <voice name="${voices[s.voiceIndex]?.name || 'default'}"><prosody pitch="${(s.pitch-1)*50}%" rate="${(s.rate-1)*50}%">${s.text}</prosody></voice>${s.breakMs>0?` <break time="${s.breakMs}ms"/>`:''}`).join('\n') + `\n</speak>`;
+            document.getElementById('ssml-output').value = ssml;
+            const m = document.getElementById('ssml-modal'); m.classList.remove('hidden'); m.classList.add('flex');
+        }
+        
+        function copySSML() {
+            document.getElementById("ssml-output").select();
+            document.execCommand("copy");
+        }
+    </script>
+</body>
+</html>
